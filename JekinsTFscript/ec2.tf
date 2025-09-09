@@ -97,27 +97,53 @@ resource "aws_instance" "ec2instance" {
 
 }
 
-resource "null_resource" "name" {
-    connection {
-        type        = "ssh"
-        host       = aws_instance.ec2instance.public_ip
-        user       = "ubuntu"
-        private_key = file("~/InfrastructureDeployment/jekinsTFscript/DevopKP.pem")
-    }
-    provisioner "file" {
-        source      = "jenkins.sh"
-        destination = "/tmp/jenkins.sh"
+# resource "null_resource" "name" {
+#     connection {
+#         type        = "ssh"
+#         host       = aws_instance.ec2instance.public_ip
+#         user       = "ubuntu"
+#         private_key = file("~/InfrastructureDeployment/jekinsTFscript/DevopKP.pem")
+#     }
+#     provisioner "file" {
+#         source      = "jenkins.sh"
+#         destination = "/tmp/jenkins.sh"
       
-    }
-  provisioner "remote-exec" {
-        inline = [
-            "chmod +x /tmp/jenkins.sh",
-            "sudo /tmp/jenkins.sh"
-        ]
+#     }
+#   provisioner "remote-exec" {
+#         inline = [
+#             "chmod +x /tmp/jenkins.sh",
+#             "sudo /tmp/jenkins.sh"
+#         ]
     
+#   }
+#   depends_on = [aws_instance.ec2instance]
+# }
+
+resource "null_resource" "name" {
+  connection {
+    type        = "ssh"
+    host        = aws_instance.ec2instance.public_ip
+    user        = "ubuntu"
+    private_key = file("${path.module}/DevopKP.pem")  # avoid ~ expansion issues
   }
+
+  provisioner "file" {
+    source      = "${path.module}/jenkins.sh"         # explicit path is safer
+    destination = "/tmp/jenkins.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "ls -l /tmp/jenkins.sh",
+      "sudo sed -i 's/\\r$//' /tmp/jenkins.sh",       # strip CRLF if any snuck in
+      "sudo chmod +x /tmp/jenkins.sh",
+      "sudo bash /tmp/jenkins.sh"                     # invoke via bash (avoids shebang issues)
+    ]
+  }
+
   depends_on = [aws_instance.ec2instance]
 }
+
 
 output "website_url" {
     value = join("", ["http://",aws_instance.ec2instance.public_dns, ":8080"])
